@@ -358,20 +358,11 @@ def process_epub(epub_file, root_dir, opf_path):
     #
     rprint(f"[green]Processed '{os.path.basename(epub_filename)}'[/]")
 
-def read_mangalist(filename):
-    with open(filename, "r", encoding="utf-8") as file:
-        mangalist = file.read().splitlines()
-    for i, item in enumerate(mangalist):
-        if item.endswith(".cbz"):
-            mangalist[i] = item[:-4] + ".epub"
-    return mangalist
-
 def main():
     root_dir = os.getcwd()
-    mangalist = read_mangalist("mangalist.txt")
     for dirpath, _, filenames in os.walk(root_dir):
         for filename in filenames:
-            if filename.endswith(".epub") and filename in mangalist:
+            if filename.endswith(".epub"):
                 epub_path = os.path.join(dirpath, filename)
                 opf_path = get_opf_file(epub_path)
                 process_epub(epub_path, root_dir, opf_path)
