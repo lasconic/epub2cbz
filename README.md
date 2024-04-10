@@ -4,7 +4,7 @@ Python program to extract .epub Manga and Comic ebooks into "cbz-ready" folders,
 # Prerequisites
 - Python 3
 - "rich" (for colored text messages) and "send2trash" (to be able to delete extracted temp folders to the recycle bin) for Python (install via: pip install rich send2trash)
-- epubs should be in the format of "[Series] v[Volume].epub", for example "Two Pieces v69.cbz" (volume numbers are optional, filename is handled as series though)
+- epubs should ideally be in the format of "[Series] v[Volume].epub", for example "Two Pieces v69.epub" (both are optional, but are derived from the filename, if enabled)
 
 # How to
 - move all to be converted .epub files into one folder
