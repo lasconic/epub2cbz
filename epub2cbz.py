@@ -323,15 +323,14 @@ def get_ncx_file(epub_file, opf_path):
         try:
             matches = re.findall(pattern, opf_content)
             pattern_inner = r'href="(.*?)"'
-            i = 0
             for item in matches:
-                if item[i] != "" and i <= len(matches):
-                    match = re.search(pattern_inner, item[i])
+                if 'href="' in item[0]:
+                    match = re.search(pattern_inner, item[0])
                     if match:
                         link = match.group(1)
                         opf_path = opf_path + link
-                elif item[i+1] != "" and i <= len(matches):
-                    match = re.search(pattern_inner, item[i+1])
+                elif 'href="' in item[1]:
+                    match = re.search(pattern_inner, item[1])
                     if match:
                         link = match.group(1)
                         opf_path = opf_path + link     
