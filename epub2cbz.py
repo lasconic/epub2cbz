@@ -17,6 +17,8 @@ btn_comicinfo = 1
 btn_title = 1
 """add volume number to comicinfo"""
 btn_volume_no = 1
+"""add series to comicinfo"""
+btn_series = 1
 """add author to comicinfo"""
 btn_author = 1
 """add publisher to comicinfo"""
@@ -261,8 +263,8 @@ def write_chapters_to_txt(chapters, epub_filename, root_dir, reading_direction, 
     with open(text_path, "w", encoding="utf-8") as text_file:
         text_file.write('<?xml version=\'1.0\' encoding=\'utf-8\'?>\n')
         text_file.write('<ComicInfo xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\">\n')
-        text_file.write('  <Series>' + folder_name.replace("_", ":") + '</Series>\n')
-        
+        if btn_series:
+            text_file.write('  <Series>' + folder_name.replace("_", ":") + '</Series>\n')
         if title and btn_title:
             text_file.write('  <Title>' + title + '</Title>\n')
         if volume_number and btn_volume_no:
