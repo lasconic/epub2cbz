@@ -43,7 +43,6 @@ def parse_alternative_cover(epub_file, opf_path, book_full):
         match_cover = re.findall(pattern_cover, opf_content)
         if match_cover:
             if  match_cover[0][1].lower().endswith(".jpg") or match_cover[0][1].lower().endswith(".jpeg") or match_cover[0][1].lower().endswith(".png"):
-                print(f"cover is image: {match_cover[0][1]}")
                 filename = match_cover[0][1]
                 filename = remove_starting_dots(filename)
                 filename = [path for path in epub.namelist() if filename in path]
@@ -51,16 +50,12 @@ def parse_alternative_cover(epub_file, opf_path, book_full):
                     if filename[0] == book_full[0]['image']:
                         print("cover already in book")
                     else:
-                        print("cover not yet in book")
                         book_full.insert(0, {'page': "Cover", 'number': book_full[0]['number'], 'image': filename[0]})
-                        print(len(book_full))
                         for i, book in enumerate(book_full):
                             if i == 0:
                                 book_full[i]['number'] = str(int(book_full[i]['number'])).zfill(len(str(len(book_full))))
                             if i > 0:
                                 book_full[i]['number'] = str(int(book_full[i]['number']) + 1).zfill(len(str(len(book_full))))
-            else:
-                print(f"cover is id: {match_cover[0][1]}")
     return book_full
 
 def parse_metadata(epub_file, opf_path):
