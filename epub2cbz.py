@@ -154,7 +154,6 @@ def parse_opf_pages(epub_file, opf_path, page_ids):
     manifest = []
     pages = []
     images = []
-    missing_images = []
     book_full = []
     match_ids = []
     is_between_tags = False
@@ -198,12 +197,8 @@ def parse_opf_pages(epub_file, opf_path, page_ids):
                     css_image = [path for path in epub.namelist() if remove_starting_dots(css_image) in path]
                     book = {'page': page, 'number': str(i).zfill(len(str(len(pages)))), 'image': css_image[0]}
                 else:
-                    rprint(f"[yellow]Info: Image path for page '{page}' not found (page# {i})[/]")
-                    missing_images.append(i)
                     book = {'page': page, 'number': str(i).zfill(len(str(len(pages)))), 'image': ""}
                 book_full.append(book)
-            if missing_images:
-                rprint(f"[yellow]Info: missing pages: {len(missing_images)}[/]")
     return book_full
 
 def parse_epub_opf(epub_file, opf_path):
@@ -255,8 +250,6 @@ def parse_epub_toc(epub_file, opf_path):
             if image_path:
                 image_path = [path for path in epub.namelist() if remove_starting_dots(image_path) in path]
                 chapter['image'] = image_path[0]
-            else:
-                rprint(f"[yellow]Info: Image path for chapter '{match[5]}' not found[/]")
             chapters.append(chapter)
 
     filenames.sort(key=natural_keys)
