@@ -3,8 +3,10 @@ import re
 from zipfile import ZipFile
 from rich import print as rprint
 from PIL import Image
-import send2trash
+from shutil import rmtree
 from datetime import datetime
+from multiprocessing import Pool
+
 
 """extract and rename images in spine order"""
 btn_extract_images = 1
@@ -35,9 +37,81 @@ btn_description = 1
 btn_chapters = 1
 
 
+def get_toc_file(epub, chapters, book_full, number):
+    new_toc = []
+    toc = []
+    new_chapters = []
+    pattern_href = r'<a href="(.*?)">'
+    
+    i = 0
+    while i < 4:
+        try:
+            alt_toc_file = [path for path in epub.namelist() if remove_starting_dots(book_full[int(number)+i]['page']) in path]
+            with epub.open(alt_toc_file[0]) as toc_content:
+                for line in toc_content:
+                    line = line.decode('utf-8').strip()
+                    if '<a href="' in line:
+                        toc.append(line)
+            for chapter in chapters:
+                new_chapter = chapter
+                new_chapters.append(new_chapter)
+            for entry in toc:
+                match = re.search(pattern_href, entry)
+                if match:
+                    for book in book_full:
+                        if os.path.basename(book['page']) == os.path.basename(match[1]):
+                            new_chapters.append({'title': f"Page {book['number']}", 'page': remove_starting_dots(match[1]), 'image': ""})
+                            break
+        except Exception as e:
+            print(e)
+            break
+        i += 1
+    
+    seen = set()
+    for new_chapter in new_chapters:
+        if os.path.basename(new_chapter['page']) not in seen:
+            seen.add(os.path.basename(new_chapter['page']))
+            new_toc.append(new_chapter.copy())
+    return new_toc
+
+def parse_alternative_toc(epub_file, opf_path, chapters, book_full):
+    is_between_tags = False
+    guide = []
+    new_toc = []
+    pattern_toc = r'<reference type="toc"(.*?)href="(.*?)"/>'
+    alt_toc_file = ""
+    
+    with ZipFile(epub_file, 'r') as epub:
+        with epub.open(opf_path) as opf_content:
+            for line in opf_content:
+                line = line.decode('utf-8').strip()
+                if "<guide" in line:
+                    is_between_tags = True
+                elif "</guide" in line:
+                    if is_between_tags:
+                        guide.append(line)
+                        break
+                    is_between_tags = False
+                if is_between_tags:
+                    guide.append(line)
+        for line in guide:
+            matches = re.findall(pattern_toc, line)
+            if matches:
+                alt_toc_file = matches[0][1]
+                break
+        if alt_toc_file:
+            for book in book_full:
+                if os.path.basename(book['page']) == os.path.basename(alt_toc_file):
+                    new_toc = get_toc_file(epub, chapters, book_full, int(book['number']))
+                    break
+        else:
+            new_toc = chapters
+    return new_toc
+
 def parse_alternative_cover(epub_file, opf_path, book_full):
     cover = ""
     pattern_cover = r'<meta name="cover"(.+?)content="(.+?)"(.+?)?/>'
+    
     with ZipFile(epub_file, 'r') as epub:
         opf_content = epub.read(opf_path).decode('utf-8')
         match_cover = re.findall(pattern_cover, opf_content)
@@ -47,15 +121,11 @@ def parse_alternative_cover(epub_file, opf_path, book_full):
                 filename = remove_starting_dots(filename)
                 filename = [path for path in epub.namelist() if filename in path]
                 if filename and filename[0] in epub.namelist():
-                    if filename[0] == book_full[0]['image']:
-                        print("cover already in book")
-                    else:
-                        book_full.insert(0, {'page': "Cover", 'number': book_full[0]['number'], 'image': filename[0]})
+                    if filename[0] != book_full[0]['image']:
+                        book_full.insert(0, {'page': "Cover", 'number': "0", 'image': filename[0]})
                         for i, book in enumerate(book_full):
-                            if i == 0:
-                                book_full[i]['number'] = str(int(book_full[i]['number'])).zfill(len(str(len(book_full))))
                             if i > 0:
-                                book_full[i]['number'] = str(int(book_full[i]['number']) + 1).zfill(len(str(len(book_full))))
+                                book_full[i]['number'] = i + 1
     return book_full
 
 def parse_metadata(epub_file, opf_path):
@@ -80,6 +150,7 @@ def parse_metadata(epub_file, opf_path):
         match_publisher = re.findall(pattern_publisher, opf_content)
         match_date = re.findall(pattern_date, opf_content)
         match_description = re.findall(pattern_description, opf_content, flags=re.DOTALL)
+        
         if match_title:
             title = match_title[0][1]
         if match_author:
@@ -105,6 +176,7 @@ def extract_images(epub_file, epub_filename, book_full):
     dimension_x = 0
     dimension_y = 0
     extension = ""
+    
     with ZipFile(epub_file, 'r') as epub:
         os.makedirs(epub_filename, exist_ok=True)
         extension = book_full[0]['image'].rsplit(".")[1]
@@ -115,31 +187,27 @@ def extract_images(epub_file, epub_filename, book_full):
                     dimension_x, dimension_y = image_dimension.size
                 break
         try:
-            for book in book_full:
+            for i, book in enumerate(book_full):
                 if book['image']:
                     epub.extract(book['image'], epub_filename)
-                    os.rename(os.path.join(epub_filename, book['image']), os.path.join(epub_filename, book['number'] + "." + book['image'].rsplit(".")[1]))
+                    os.rename(os.path.join(epub_filename, book['image']), os.path.join(epub_filename, str(i).zfill(len(str(len(book_full)))) + "." + book['image'].rsplit(".")[1]))
                 else:
                     image = create_blank_image(dimension_x, dimension_y)
-                    image.save(os.path.join(epub_filename, book['number'] + "." + extension))
+                    image.save(os.path.join(epub_filename, str(i).zfill(len(str(len(book_full)))) + "." + extension))
         except Exception as e:
-            rprint(f"[red]Warning: Folder for book {epub_filename} not empty. Delete or empty and try again.[/]")
+            rprint(f"[red]Warning: Folder for book {epub_filename} not empty. Delete or empty and try again. {e}[/]")
     if btn_delete_temp:
         for root, dirs, _ in os.walk(epub_filename):
             for dir in dirs:
                 try:
-                    send2trash.send2trash(os.path.join(root, dir))
-                    print(f"Info: Cleaned up temp folder \"{os.path.join(root, dir)}\" to recycle bin")
+                    rmtree(os.path.join(root, dir))
+                    print(f"Info: Cleaned up temp folder \"{os.path.join(root, dir)}\"")
                 except Exception as e:
                     rprint(f"Exception deleting: [red]{e}[/]")
 
-def natural_keys(text):
-    def convert(text):
-        return float(text) if text.replace('.', '', 1).isdigit() else text.lower()
-    return [ convert(c) for c in re.split('([0-9]+(?:\.[0-9]*)?)', text) ]
-
 def parse_reading_direction(epub_file, opf_path):
     reading_direction = ""
+    
     with ZipFile(epub_file, 'r') as epub:
         opf_content = epub.read(opf_path).decode('utf-8')
         pattern = r'page-progression-direction="(.+?)"'
@@ -172,6 +240,7 @@ def parse_opf_pages(epub_file, opf_path, page_ids):
                 elif "</manifest" in line:
                     if is_between_tags:
                         manifest.append(line)
+                        break
                     is_between_tags = False
                 if is_between_tags:
                     manifest.append(line)
@@ -190,14 +259,14 @@ def parse_opf_pages(epub_file, opf_path, page_ids):
                 if image_path:
                     image_path = [path for path in epub.namelist() if remove_starting_dots(image_path) in path]
                     images.append(image_path[0])
-                    book = {'page': page, 'number': str(i).zfill(len(str(len(pages)))), 'image': image_path[0]}
+                    book = {'page': page, 'number': i, 'image': image_path[0]}
                     cover_found = True
                 elif match_ids[i] and cover_found == False:
                     css_image = find_image_path_in_css(epub, css_path, match_ids[i][0])
                     css_image = [path for path in epub.namelist() if remove_starting_dots(css_image) in path]
-                    book = {'page': page, 'number': str(i).zfill(len(str(len(pages)))), 'image': css_image[0]}
+                    book = {'page': page, 'number': i, 'image': css_image[0]}
                 else:
-                    book = {'page': page, 'number': str(i).zfill(len(str(len(pages)))), 'image': ""}
+                    book = {'page': page, 'number': i, 'image': ""}
                 book_full.append(book)
     return book_full
 
@@ -216,6 +285,7 @@ def parse_epub_opf(epub_file, opf_path):
                 elif "</spine" in line:
                     if is_between_tags:
                         spine.append(line)
+                        break
                     is_between_tags = False
                 if is_between_tags:
                     spine.append(line)
@@ -228,32 +298,47 @@ def parse_epub_opf(epub_file, opf_path):
 
 def parse_epub_toc(epub_file, opf_path):
     chapters = []
-    filenames = []
-    image_count = 0
 
     with ZipFile(epub_file, 'r') as epub:
-        toc_file = epub.namelist()
-        for file in toc_file:
-            extension = file.split('.')[-1].lower()
-            if extension in ['jpg', 'jpeg', 'png']:
-                filenames.append(file)
-                image_count += 1
-
         ncx_path = get_ncx_file(epub_file, opf_path)
-        toc_content = epub.read(ncx_path).decode('utf-8')
         
-        pattern = r'<(^ncx:|(?!\/).*?)navPoint(.|\n)*?<(^ncx:|(?!\/).*?)navLabel>(.|\n)*?<(^ncx:|(?!\/).*?)text>(.*?)</(^ncx:|.*?)text>(.|\n)*?</(^ncx:|.*?)navLabel>(.|\n)*?<(^ncx:|(?!\/).*?)content src="(.+?)"/>'
-        matches = re.findall(pattern, toc_content)
-        for match in matches:
-            chapter = {'title': match[5].strip(), 'page': match[11].strip()}          
-            image_path = find_image_path_in_file(epub, match[11].rsplit("#", 1)[0])
-            if image_path:
-                image_path = [path for path in epub.namelist() if remove_starting_dots(image_path) in path]
-                chapter['image'] = image_path[0]
-            chapters.append(chapter)
-
-    filenames.sort(key=natural_keys)
-    return chapters, filenames, image_count
+        if ncx_path.endswith(".ncx"):
+            toc_content = epub.read(ncx_path).decode('utf-8')
+            pattern = r'<(^ncx:|(?!\/).*?)navPoint(.|\n)*?<(^ncx:|(?!\/).*?)navLabel>(.|\n)*?<(^ncx:|(?!\/).*?)text>(.*?)</(^ncx:|.*?)text>(.|\n)*?</(^ncx:|.*?)navLabel>(.|\n)*?<(^ncx:|(?!\/).*?)content src="(.+?)"/>'
+            matches = re.findall(pattern, toc_content)
+            for match in matches:
+                chapter = {'title': match[5].strip(), 'page': match[11].strip()}          
+                image_path = find_image_path_in_file(epub, match[11].rsplit("#", 1)[0])
+                if image_path:
+                    image_path = [path for path in epub.namelist() if remove_starting_dots(image_path) in path]
+                    chapter['image'] = image_path[0]
+                chapters.append(chapter)
+        elif ncx_path.endswith(".xhtml"):
+            nav = []
+            is_between_tags = False
+            pattern = r'<a href="(.*?)">(.*?)</a>'
+            with epub.open(ncx_path) as toc_content:
+                for line in toc_content:
+                    line = line.decode('utf-8').strip()
+                    if 'epub:type="toc"' in line:
+                        is_between_tags = True
+                    elif '</nav' in line:
+                        if is_between_tags:
+                            nav.append(line)
+                            break
+                        is_between_tags = False
+                    if is_between_tags:
+                        nav.append(line)
+                for line in nav:
+                    matches = re.findall(pattern, line)
+                    for match in matches:
+                        chapter = {'title': match[1].strip(), 'page': match[0].strip()}          
+                        image_path = find_image_path_in_file(epub, match[0].rsplit("#", 1)[0])
+                        if image_path:
+                            image_path = [path for path in epub.namelist() if remove_starting_dots(image_path) in path]
+                            chapter['image'] = image_path[0]
+                        chapters.append(chapter)
+    return chapters
 
 def remove_starting_dots(path):
     if path.startswith("../") or path.startswith("./"):
@@ -265,6 +350,7 @@ def find_image_path_in_css(epub, filename, page_id):
     image_path = None
     filename = remove_starting_dots(filename)
     filename = [path for path in epub.namelist() if filename in path]
+    
     if filename and filename[0] in epub.namelist():
         file_content = epub.read(filename[0]).decode('utf-8')
         image_path_patterns_css = [rf'#{page_id}(.*?)background-image:(.*?)url\(\"(.*?\.jpg|.*?\.jpeg|.*?\.png)\"\)']
@@ -284,7 +370,8 @@ def find_image_path_in_file(epub, filename):
     image_path = None
     filename = remove_starting_dots(filename)
     filename = [path for path in epub.namelist() if filename in path]
-    if filename and filename[0] in epub.namelist():
+    
+    if filename and filename[0] in epub.namelist() and (filename[0].endswith(".xhtml") or filename[0].endswith(".html")):
         file_content = epub.read(filename[0]).decode('utf-8')
         image_path_patterns = [r'src="(.*?\.jpg|.*?\.jpeg|.*?\.png)"',r'xlink:href="(.*?\.jpg|.*?\.jpeg|.*?\.png)"']
         for pattern in image_path_patterns:
@@ -292,7 +379,8 @@ def find_image_path_in_file(epub, filename):
             if image_match:
                 image_path = image_match.group(1)
                 break
-
+    elif filename and filename[0] in epub.namelist() and (filename[0].endswith(".jpg") or filename[0].endswith(".jpeg") or filename[0].endswith(".png")):
+        image_path = filename[0]
     else:
         rprint(f"[blue]file not found {filename}[/]")
     return image_path
@@ -313,6 +401,7 @@ def write_chapters_to_txt(chapters, epub_filename, root_dir, reading_direction, 
     os.makedirs(epub_filename, exist_ok=True)
     bookmark = ""
     author, title, language, publisher, date, description = metadata[0]
+    
     with open(text_path, "w", encoding="utf-8") as text_file:
         text_file.write('<?xml version=\'1.0\' encoding=\'utf-8\'?>\n')
         text_file.write('<ComicInfo xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\">\n')
@@ -391,7 +480,6 @@ def get_css_file(epub_file, opf_path):
                         opf_path = opf_path + link    
             return opf_path
         except IndexError:
-
             rprint(f"[red]couldnt find .css file in .opf of {epub_file}[/]")
             return
         rprint(f"[red]returned outside of try with {matches}[/]")
@@ -406,37 +494,63 @@ def get_ncx_file(epub_file, opf_path):
             opf_path = ""
 
         pattern = r'<item (.*?)media-type="application/x-dtbncx\+xml"(.*?)/>'
+        pattern_nav = r'<item (.*?)?properties="nav"(.*?)?/>'
 
         try:
             matches = re.findall(pattern, opf_content)
+            matches_nav = re.findall(pattern_nav, opf_content)
             pattern_inner = r'href="(.*?)"'
-            for item in matches:
-                if 'href="' in item[0]:
-                    match = re.search(pattern_inner, item[0])
-                    if match:
-                        link = match.group(1)
-                        opf_path = opf_path + link
-                elif 'href="' in item[1]:
-                    match = re.search(pattern_inner, item[1])
-                    if match:
-                        link = match.group(1)
-                        opf_path = opf_path + link
-            return opf_path
+            
+            if matches:
+                for item in matches:
+                    if 'href="' in item[0]:
+                        match = re.search(pattern_inner, item[0])
+                        if match:
+                            link = match.group(1)
+                            opf_path = opf_path + link
+                            break
+                    elif'href="' in item[1]:
+                        match = re.search(pattern_inner, item[1])
+                        if match:
+                            link = match.group(1)
+                            opf_path = opf_path + link
+                            break
+                return opf_path
+            elif matches_nav:
+                for item in matches_nav:
+                    if 'href="' in item[0]:
+                        match = re.search(pattern_inner, item[0])
+                        if match:
+                            link = match.group(1)
+                            opf_path = opf_path + link
+                            break
+                    elif'href="' in item[1]:
+                        match = re.search(pattern_inner, item[1])
+                        if match:
+                            link = match.group(1)
+                            opf_path = opf_path + link
+                            break
+                return opf_path
         except IndexError:
-
             rprint(f"[red]couldnt find .ncx file in .opf of {epub_file}[/]")
             return
         rprint(f"[red]returned outside of try with {matches}[/]")
         return
 
 def process_epub(epub_file, root_dir, opf_path):
-    chapters, filenames, image_count = parse_epub_toc(epub_file, opf_path)
+    chapters = parse_epub_toc(epub_file, opf_path)
     epub_filename = epub_file.split(os.path.sep)[-1].rsplit(".")[0]
     book_full = parse_epub_opf(epub_file, opf_path)
     #
     metadata = [parse_metadata(epub_file, opf_path)]
     #
     book_full = parse_alternative_cover(epub_file, opf_path, book_full)
+    #
+    chapters = parse_alternative_toc(epub_file, opf_path, chapters, book_full)
+    #
+    if os.path.basename(chapters[0]['page'].rsplit("#", 1)[0]) == os.path.basename(book_full[1]['page']) and chapters[0]['title'] == "Cover":
+        del book_full[1]
+        rprint(f"[red]Removed duplicate cover for '{os.path.basename(epub_filename)}'[/]")
     #
     if btn_extract_images:
         extract_images(epub_file, epub_filename, book_full)
@@ -450,12 +564,17 @@ def process_epub(epub_file, root_dir, opf_path):
 
 def main():
     root_dir = os.getcwd()
+    epub_paths = []
+    
     for dirpath, _, filenames in os.walk(root_dir):
         for filename in filenames:
             if filename.endswith(".epub"):
                 epub_path = os.path.join(dirpath, filename)
                 opf_path = get_opf_file(epub_path)
-                process_epub(epub_path, root_dir, opf_path)
+                epub_paths.append((epub_path, root_dir, opf_path))
+
+    with Pool() as pool:
+        pool.starmap(process_epub, epub_paths)
 
 if __name__ == "__main__":
     main()
