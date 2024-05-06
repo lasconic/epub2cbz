@@ -37,10 +37,9 @@ btn_description = 1
 btn_chapters = 1
 
 
-def get_toc_file(epub, chapters, book_full, number):
+def get_toc_file(epub, new_chapters, book_full, number):
     new_toc = []
     toc = []
-    new_chapters = []
     pattern_href = r'<a href="(.*?)">'
     
     i = 0
@@ -52,9 +51,6 @@ def get_toc_file(epub, chapters, book_full, number):
                     line = line.decode('utf-8').strip()
                     if '<a href="' in line:
                         toc.append(line)
-            for chapter in chapters:
-                new_chapter = chapter
-                new_chapters.append(new_chapter)
             for entry in toc:
                 match = re.search(pattern_href, entry)
                 if match:
@@ -69,8 +65,8 @@ def get_toc_file(epub, chapters, book_full, number):
     
     seen = set()
     for new_chapter in new_chapters:
-        if os.path.basename(new_chapter['page']) not in seen:
-            seen.add(os.path.basename(new_chapter['page']))
+        if os.path.basename(new_chapter['page'].rsplit("#", 1)[0]) not in seen:
+            seen.add(os.path.basename(new_chapter['page'].rsplit("#", 1)[0]))
             new_toc.append(new_chapter.copy())
     return new_toc
 
@@ -307,7 +303,7 @@ def parse_epub_toc(epub_file, opf_path):
             pattern = r'<(^ncx:|(?!\/).*?)navPoint(.|\n)*?<(^ncx:|(?!\/).*?)navLabel>(.|\n)*?<(^ncx:|(?!\/).*?)text>(.*?)</(^ncx:|.*?)text>(.|\n)*?</(^ncx:|.*?)navLabel>(.|\n)*?<(^ncx:|(?!\/).*?)content src="(.+?)"/>'
             matches = re.findall(pattern, toc_content)
             for match in matches:
-                chapter = {'title': match[5].strip(), 'page': match[11].strip()}          
+                chapter = {'title': match[5].strip(), 'page': match[11].rsplit("#", 1)[0].strip()}          
                 image_path = find_image_path_in_file(epub, match[11].rsplit("#", 1)[0])
                 if image_path:
                     image_path = [path for path in epub.namelist() if remove_starting_dots(image_path) in path]
@@ -332,12 +328,16 @@ def parse_epub_toc(epub_file, opf_path):
                 for line in nav:
                     matches = re.findall(pattern, line)
                     for match in matches:
-                        chapter = {'title': match[1].strip(), 'page': match[0].strip()}          
+                        chapter = {'title': match[1].strip(), 'page': match[0].rsplit("#", 1)[0].strip()}          
                         image_path = find_image_path_in_file(epub, match[0].rsplit("#", 1)[0])
                         if image_path:
                             image_path = [path for path in epub.namelist() if remove_starting_dots(image_path) in path]
                             chapter['image'] = image_path[0]
                         chapters.append(chapter)
+    for i, chapter in enumerate(chapters):
+        if i < (len(chapters) - 1) and chapter['page'] == chapters[i+1]['page']:
+            chapter['title'] = chapter['title'] + " - " + chapters[i+1]['title']
+            del chapters[i+1]
     return chapters
 
 def remove_starting_dots(path):
