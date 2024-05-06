@@ -60,7 +60,7 @@ def get_toc_file(epub, chapters, book_full, number):
                 if match:
                     for book in book_full:
                         if os.path.basename(book['page']) == os.path.basename(match[1]):
-                            new_chapters.append({'title': f"Page {book['number']}", 'page': remove_starting_dots(match[1]), 'image': ""})
+                            new_chapters.append({'title': f"Page {book['number'] + 1}", 'page': remove_starting_dots(match[1]), 'image': ""})
                             break
         except Exception as e:
             print(e)
