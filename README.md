@@ -3,7 +3,7 @@ Python program to extract .epub Manga and Comic ebooks into "cbz-ready" folders,
 
 # Prerequisites
 - Python 3
-- "rich" (for colored text messages) and "PIL" (to be able to create empty images) for Python (install via: pip install rich pillow)
+- "rich" (for colored text messages) and "PIL" (to be able to create blank images) for Python (install via: pip install rich pillow)
 - epubs should ideally be in the format of "[Series] v[Volume].epub", for example "Two Pieces v69.epub" (both are optional, but are derived from the filename, if enabled)
 
 # How to
