@@ -195,7 +195,7 @@ def extract_images(epub_file, epub_filename, book_full):
                     image = create_blank_image(dimension_x, dimension_y)
                     image.save(os.path.join(epub_filename, str(i).zfill(len(str(len(book_full)))) + "." + extension))
         except Exception as e:
-            rprint(f"[red]Warning: Folder for book {epub_filename} not empty. Delete or empty and try again. {e}[/]")
+            rprint(f"[red]Warning: Folder for book {epub_filename} not empty. Delete or empty and try again.[/]")
     if btn_delete_temp:
         for root, dirs, _ in os.walk(epub_filename):
             for dir in dirs:
@@ -550,7 +550,7 @@ def process_epub(epub_file, root_dir, opf_path):
     #
     if os.path.basename(chapters[0]['page'].rsplit("#", 1)[0]) == os.path.basename(book_full[1]['page']) and chapters[0]['title'] == "Cover":
         del book_full[1]
-        rprint(f"[red]Removed duplicate cover for '{os.path.basename(epub_filename)}'[/]")
+        rprint(f"[yellow]Info: Removed duplicate cover for '{os.path.basename(epub_filename)}'[/]")
     #
     if btn_extract_images:
         extract_images(epub_file, epub_filename, book_full)
