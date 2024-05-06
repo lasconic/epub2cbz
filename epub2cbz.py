@@ -195,13 +195,13 @@ def extract_images(epub_file, epub_filename, book_full):
                     image = create_blank_image(dimension_x, dimension_y)
                     image.save(os.path.join(epub_filename, str(i).zfill(len(str(len(book_full)))) + "." + extension))
         except Exception as e:
-            rprint(f"[red]Warning: Folder for book {epub_filename} not empty. Delete or empty and try again.[/]")
+            rprint(f"[red]Warning: Folder for book '{epub_filename}' not empty. Delete or empty and try again.[/]")
     if btn_delete_temp:
         for root, dirs, _ in os.walk(epub_filename):
             for dir in dirs:
                 try:
                     rmtree(os.path.join(root, dir))
-                    print(f"Info: Cleaned up temp folder \"{os.path.join(root, dir)}\"")
+                    print(f"Info: Cleaned up temp folder '{os.path.join(root, dir)}'")
                 except Exception as e:
                     rprint(f"Exception deleting: [red]{e}[/]")
 
