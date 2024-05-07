@@ -10,7 +10,7 @@ from multiprocessing import Pool
 
 """extract and rename images in spine order"""
 btn_extract_images = 1
-"""delete temp folders to recycle bin"""
+"""delete temp folders"""
 btn_delete_temp = 1
 
 """create comicinfo.xml file"""
