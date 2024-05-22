@@ -408,15 +408,15 @@ def write_chapters_to_txt(chapters, epub_filename, root_dir, reading_direction, 
         if btn_series:
             text_file.write('  <Series>' + folder_name.replace("_", ":") + '</Series>\n')
         if title and btn_title:
-            text_file.write('  <Title>' + title + '</Title>\n')
+            text_file.write('  <Title>' + title.strip() + '</Title>\n')
         if volume_number and btn_volume_no:
             text_file.write('  <Volume>' + str(volume_number) + '</Volume>\n')
         if publisher and btn_publisher:
-            text_file.write('  <Publisher>' + publisher + '</Publisher>\n')
+            text_file.write('  <Publisher>' + publisher.strip() + '</Publisher>\n')
         if language and btn_language:
-            text_file.write('  <LanguageISO>' + language + '</LanguageISO>\n')
+            text_file.write('  <LanguageISO>' + language.strip() + '</LanguageISO>\n')
         if author and btn_author:
-            text_file.write('  <Writer>' + author + '</Writer>\n')
+            text_file.write('  <Writer>' + author.strip() + '</Writer>\n')
             
         text_file.write('  <Pages>\n')
         
@@ -431,7 +431,7 @@ def write_chapters_to_txt(chapters, epub_filename, root_dir, reading_direction, 
                         bookmark = chapter['title']
 
             if bookmark and btn_chapters:
-                text_file.write(f"Bookmark=\"{bookmark}\" ")
+                text_file.write(f"Bookmark=\"{bookmark.strip()}\" ")
             text_file.write(f"Image=\"{i}\" />\n")
         
         text_file.write('  </Pages>\n')
@@ -443,7 +443,7 @@ def write_chapters_to_txt(chapters, epub_filename, root_dir, reading_direction, 
         if btn_reading_dir:
             text_file.write(f"  <Manga>{reading_direction}</Manga>\n")
         if description and btn_description:
-            text_file.write(f"  <Summary>{description}</Summary>\n")
+            text_file.write(f"  <Summary>{description.strip()}</Summary>\n")
         text_file.write('</ComicInfo>')
 
 def get_opf_file(epub_file):
