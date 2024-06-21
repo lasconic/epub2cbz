@@ -1,0 +1,4 @@
+beautifulsoup4==4.12.3
+lxml==5.2.2
+pillow==10.3.0
+rich==13.7.1
